@@ -301,4 +301,6 @@ Temporary Items
 ### Vagrant Patch ###
 *.box
 
+settings.xml
+
 # End of https://www.gitignore.io/api/osx,node,maven,vagrant,eclipse,intellij+all
