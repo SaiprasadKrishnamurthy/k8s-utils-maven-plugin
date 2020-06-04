@@ -31,9 +31,11 @@ public class K8sDeploymentDescriptorGenerator {
     private static String SCOPED_VARIABLE_SERVICE_VERSION = "version";
     private static String SCOPED_VARIABLE_CONFIG_MAP_TEMPLATE_NAME = "configMapTemplateName";
     private static String SCOPED_VARIABLE_FULLY_QUALIFIED_DOCKER_IMAGE_NAME = "fullyQualifiedDockerImageName";
+    private static String SCOPED_VARIABLE_REPLICAS = "replicas";
+    private static String SCOPED_VARIABLE_VOLUME_MOUNT = "volumeMount";
 
 
-    public static void generate(final String projectArtifactId, final String projectVersion, final String fullyQualifiedDockerImageName) throws Exception {
+    public static void generate(final String projectArtifactId, final String projectVersion, final String fullyQualifiedDockerImageName, final int replicas, final String volumeMount) throws Exception {
         Map<String, Properties> environmentsAndProperties = new HashMap<>();
         Map<String, TreeMap<Object, Object>> mergedPropertiesPerEnvironment = new HashMap<>();
         Files.walk(Paths.get(SPRING_PROPERTY_FILES_BASE_DIR))
@@ -62,13 +64,14 @@ public class K8sDeploymentDescriptorGenerator {
                 .filter(key -> key.length() > 0)
                 .forEach(env -> {
                     TreeMap<Object, Object> merged = merge(base, environmentsAndProperties.get(env));
-                    merged.put("build_version", projectVersion);
-                    merged.put(SCOPED_VARIABLE_ARTIFACT_ID, projectArtifactId);
-                    merged.put(SCOPED_VARIABLE_SERVICE_NAME, projectArtifactId);
-                    merged.put(SCOPED_VARIABLE_SERVICE_VERSION, projectVersion);
-                    merged.put(SCOPED_VARIABLE_FULLY_QUALIFIED_DOCKER_IMAGE_NAME, fullyQualifiedDockerImageName);
+                    addScopedProperties(projectArtifactId, projectVersion, fullyQualifiedDockerImageName, replicas, volumeMount, merged);
                     mergedPropertiesPerEnvironment.put(env, merged);
                 });
+        if (mergedPropertiesPerEnvironment.isEmpty()) {
+            TreeMap<Object, Object> merged = merge(environmentsAndProperties.get(""));
+            addScopedProperties(projectArtifactId, projectVersion, fullyQualifiedDockerImageName, replicas, volumeMount, merged);
+            mergedPropertiesPerEnvironment.put("default", merged);
+        }
         // Generate yml files using the templates.
         String configMapTemplate = IOUtils.toString(K8sDeploymentDescriptorGenerator.class.getClassLoader().getResourceAsStream("configmap-template.yml"), Charset.defaultCharset());
         String deployTemplate = IOUtils.toString(K8sDeploymentDescriptorGenerator.class.getClassLoader().getResourceAsStream("service-deployment-template.yml"), Charset.defaultCharset());
@@ -79,11 +82,24 @@ public class K8sDeploymentDescriptorGenerator {
         Map<String, String> generatedEncryptedProperties = generateProperties(mergedPropertiesPerEnvironment);
         writeFile(projectArtifactId + "-" + "configmap", generatedConfigMapYmls, ".yml");
         writeFile(projectArtifactId + "-" + "deployment", generatedDeploymentYmls, ".yml");
-        writeFile(projectArtifactId + "-" + "encrypted", generatedEncryptedProperties, ".properties");
+        //writeFile(projectArtifactId + "-" + "encrypted", generatedEncryptedProperties, ".properties");
         // Replace the variables in the shell scripts.
         generateScripts(projectArtifactId, mergedPropertiesPerEnvironment, "deploy_configs.sh", IOUtils.toString(K8sDeploymentDescriptorGenerator.class.getClassLoader().getResourceAsStream("deploy_configs.sh"), Charset.defaultCharset()));
         generateScripts(projectArtifactId, mergedPropertiesPerEnvironment, "deploy_service.sh", IOUtils.toString(K8sDeploymentDescriptorGenerator.class.getClassLoader().getResourceAsStream("deploy_service.sh"), Charset.defaultCharset()));
         generateScripts(projectArtifactId, mergedPropertiesPerEnvironment, "logs.sh", IOUtils.toString(K8sDeploymentDescriptorGenerator.class.getClassLoader().getResourceAsStream("logs.sh"), Charset.defaultCharset()));
+    }
+
+    private static void addScopedProperties(String projectArtifactId, String projectVersion, String fullyQualifiedDockerImageName, int replicas, String volumeMount, TreeMap<Object, Object> merged) {
+        merged.put("build_version", projectVersion);
+        merged.put(SCOPED_VARIABLE_ARTIFACT_ID, projectArtifactId);
+        merged.put(SCOPED_VARIABLE_SERVICE_NAME, projectArtifactId);
+        merged.put(SCOPED_VARIABLE_SERVICE_VERSION, projectVersion);
+        merged.put(SCOPED_VARIABLE_FULLY_QUALIFIED_DOCKER_IMAGE_NAME, fullyQualifiedDockerImageName);
+        merged.put(SCOPED_VARIABLE_VOLUME_MOUNT, volumeMount);
+        if (!merged.containsKey("server.port")) {
+            merged.put("server.port", "8080"); // default spring boot.
+        }
+        merged.put(SCOPED_VARIABLE_REPLICAS, replicas);
     }
 
     private static void generateScripts(String projectArtifactId, Map<String, TreeMap<Object, Object>> mergedPropertiesPerEnvironment, String fileName, String contents) {

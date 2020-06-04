@@ -23,6 +23,12 @@ public class GenerateDeploymentsMojo extends AbstractMojo {
     @Parameter(property = "dockerImagePrefix")
     private String dockerImagePrefix;
 
+    @Parameter(property = "replicas", defaultValue = "1")
+    private int replicas;
+
+    @Parameter(property = "volumeMount", defaultValue = "/tmp")
+    private String volumeMount;
+
     @Parameter(property = "skip")
     private boolean skip;
 
@@ -32,9 +38,9 @@ public class GenerateDeploymentsMojo extends AbstractMojo {
                 String groupId = project.getGroupId();
                 String artifactId = project.getArtifactId();
                 String version = project.getVersion();
-                String dockerFullyQualifiedName = dockerImageNamespace + "/" + dockerImagePrefix + artifactId;
+                String dockerFullyQualifiedName = dockerImageNamespace + "/" + dockerImagePrefix + "/" + artifactId;
                 getLog().info(String.format(" Generating Kubernetes Deployment Files for:  %s:%s:%s", groupId, artifactId, version));
-                K8sDeploymentDescriptorGenerator.generate(artifactId, version, dockerFullyQualifiedName);
+                K8sDeploymentDescriptorGenerator.generate(artifactId, version, dockerFullyQualifiedName, replicas, volumeMount);
             } catch (Exception ex) {
                 getLog().error(ex);
                 throw new RuntimeException(ex);
