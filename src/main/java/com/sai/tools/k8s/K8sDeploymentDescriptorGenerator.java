@@ -96,8 +96,8 @@ public class K8sDeploymentDescriptorGenerator {
         merged.put(SCOPED_VARIABLE_SERVICE_VERSION, projectVersion);
         merged.put(SCOPED_VARIABLE_FULLY_QUALIFIED_DOCKER_IMAGE_NAME, fullyQualifiedDockerImageName);
         merged.put(SCOPED_VARIABLE_VOLUME_MOUNT, volumeMount);
-        if (!merged.containsKey("server.port")) {
-            merged.put("server.port", "8080"); // default spring boot.
+        if (!merged.containsKey("server.port") && !merged.containsKey("server_port")) {
+            merged.put("server_port", "8080"); // default spring boot.
         }
         merged.put(SCOPED_VARIABLE_REPLICAS, replicas);
     }
